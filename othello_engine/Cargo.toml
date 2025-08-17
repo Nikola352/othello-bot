@@ -1,0 +1,12 @@
+[package]
+name = "othello_engine"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "othello_engine"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.25.1", features = ["extension-module"] }
+numpy = "0.25.0"
