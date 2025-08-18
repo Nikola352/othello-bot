@@ -1,12 +1,11 @@
+use crate::bridge::state::PyGameState;
 use pyo3::prelude::*;
 
-/// Doubles the number
-#[pyfunction]
-fn double(x: i32) -> i32 {
-    2 * x
-}
+mod othello;
+mod bridge;
 
 #[pymodule]
 pub fn othello_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(double, m)?)
+    m.add_class::<PyGameState>()?;
+    Ok(())
 }
