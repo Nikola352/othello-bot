@@ -50,7 +50,8 @@ def train_rl(save_path: str, start_checkpoint_path: str = None, start_episode = 
                 agent.save_model(os.path.join(checkpoint_dir, f"checkpoint_{episode:05d}.pth"))
 
     # Save to disk
-    agent.save_model(save_path)
+    agent.save_model(os.path.join(checkpoint_dir, f"checkpoint_final.pth"))
+    agent.save_policy_net(save_path)
 
     # Plot training results
     plt.figure(figsize=(15, 10))
@@ -64,3 +65,26 @@ def train_rl(save_path: str, start_checkpoint_path: str = None, start_episode = 
 
     plt.tight_layout()
     plt.show()
+
+
+"""
+def evaluate(agent, mode = 'rand', player = BLACK, num_games = 5):
+    result = 0
+    for _ in range(num_games):
+        strategy = GreedyStrategy() if mode == 'hard' else RandomStrategy()
+        state = EnvState()
+        while not state.is_final():
+            if not state.get_available_actions():
+                continue
+
+            if state.turn == player:
+                action = agent.select_optimal_action(state)
+            else:
+                action = strategy.get_move(state.board, state.turn)
+
+            if action is not None:
+                state.act(action)
+
+        result += state.get_result()
+    return result / num_games
+"""

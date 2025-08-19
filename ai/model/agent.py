@@ -127,3 +127,7 @@ class DqnAgent(object):
         agent.load_model(model_path)
         agent.policy_net.eval()
         return agent
+
+    def save_policy_net(self, path: str):
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        torch.save(self.policy_net.state_dict(), path)
