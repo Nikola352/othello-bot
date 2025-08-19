@@ -6,7 +6,7 @@ from train.rl import train_rl
 def main():
     states, actions = prepare_dataset("../data/othello_dataset.csv")
     network = train_supervised(states, actions, save_path="../output/supervised/network.pth")
-    train_rl("../output/rl/model.pth", policy_net=network)
+    train_rl("../output/rl/model.pth", policy_net=network, checkpoint_dir="../output/rl/checkpoints")
 
 
 if __name__ == "__main__":
