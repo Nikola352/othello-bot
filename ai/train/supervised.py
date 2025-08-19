@@ -65,7 +65,7 @@ def train_supervised(states, actions, save_path: str = None, start_model_path: s
     # Save to disk
     if save_path is not None:
         Path(save_path).parent.mkdir(parents=True, exist_ok=True)
-        torch.save(network.state_dict, save_path)
+        torch.save(network.state_dict(), save_path)
 
     # Plot the loss curve
     plt.figure(figsize=(10, 5))
