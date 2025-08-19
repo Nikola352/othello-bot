@@ -30,10 +30,7 @@ class EnvState(object):
         self.game_state = self.game_state.play_move(action[0], action[1])
         
         if self.is_final():
-            # return 100_000 * (self.get_result() if -self.turn == BLACK else -self.get_result())
             return self.get_result() if -self.turn == BLACK else -self.get_result()
-
-        # return evaluate_board(self.board) if -self.turn == BLACK else -evaluate_board(self.board)
         return 0
 
     def skip_move(self):

@@ -24,7 +24,7 @@ class DqnAgent(object):
 
         self.memory = ReplayMemory(REPLAY_CAP)
 
-        self.optimizer = optim.Adam(self.policy_net.parameters(), lr=LR)
+        self.optimizer = optim.Adam(self.policy_net.parameters(), lr=RL_LR)
 
     def select_action(self, state: EnvState, eps: float):
         """Select an action using ε-greedy strategy"""

@@ -1,20 +1,32 @@
 import os
 import numpy as np
+import pandas as pd
 import torch
 import matplotlib.pyplot as plt
 
+from train.process_games import preload_expert_memory
 from model.network import DeepQNetwork
 from model.agent import DqnAgent
 from model.settings import EPS_DECAY, LR, START_EPS, END_EPS, EPISODES, TARGET_LIFESPAN
 from environment.environment import EnvState
 
 
-def train_rl(save_path: str, start_checkpoint_path: str = None, start_episode = 0, checkpoint_dir: str = None, policy_net: DeepQNetwork = None):
+def train_rl(
+        save_path: str,
+        start_checkpoint_path: str = None, 
+        start_episode = 0, 
+        checkpoint_dir: str = None, 
+        policy_net: DeepQNetwork = None,
+        expert_data_path: str = None,
+    ):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     agent = DqnAgent(device, policy_net=policy_net)
     if start_checkpoint_path and os.path.exists(start_checkpoint_path):
         agent.load_model(start_checkpoint_path)
+
+    if expert_data_path:
+        preload_expert_memory(agent, expert_data_path, max_games=17_000)
 
     losses = []
 
@@ -65,26 +77,3 @@ def train_rl(save_path: str, start_checkpoint_path: str = None, start_episode = 
 
     plt.tight_layout()
     plt.show()
-
-
-"""
-def evaluate(agent, mode = 'rand', player = BLACK, num_games = 5):
-    result = 0
-    for _ in range(num_games):
-        strategy = GreedyStrategy() if mode == 'hard' else RandomStrategy()
-        state = EnvState()
-        while not state.is_final():
-            if not state.get_available_actions():
-                continue
-
-            if state.turn == player:
-                action = agent.select_optimal_action(state)
-            else:
-                action = strategy.get_move(state.board, state.turn)
-
-            if action is not None:
-                state.act(action)
-
-        result += state.get_result()
-    return result / num_games
-"""
