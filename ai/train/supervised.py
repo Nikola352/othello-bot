@@ -11,24 +11,24 @@ from model.settings import BATCH_SIZE, EPOCHS, LR
 
 
 class GameDataset(Dataset):
-    def __init__(self, states, actions):
+    def __init__(self, states, values):
         self.states = states
-        self.actions = actions
+        self.values = values
 
     def __len__(self):
         return len(self.states)
 
     def __getitem__(self, idx):
         state = self.states[idx]
-        action = torch.tensor(self.actions[idx], dtype=torch.int64)
-        return state, action
+        value = torch.tensor(self.values[idx], dtype=torch.float32)
+        return state, value
 
 
-def train_supervised(states, actions, save_path: str = None, start_model_path: str = None) -> DeepQNetwork:
+def train_supervised(states, values, save_path: str = None, start_model_path: str = None) -> DeepQNetwork:
     """
     Pretrain agent's policy network using (state -> action) pairs
     """
-    dataset = GameDataset(states, actions)
+    dataset = GameDataset(states, values)
     loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -40,20 +40,24 @@ def train_supervised(states, actions, save_path: str = None, start_model_path: s
     network.train()
 
     optimizer = optim.Adam(network.parameters(), lr=LR)
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.MSELoss()
 
     losses = []
 
     for epoch in range(EPOCHS):
         total_loss = 0.0
-        for state, action in loader:
+        for state, target_value in loader:
             state = state.to(device)
-            action = action.to(device)
+            target_value = target_value.to(device)
 
             optimizer.zero_grad()
+
             q_values = network(state)
-            loss = criterion(q_values, action)
+            predicted_value = q_values.max(dim=1).values
+
+            loss = criterion(predicted_value, target_value)
             loss.backward()
+            
             optimizer.step()
             
             total_loss += loss.item()
