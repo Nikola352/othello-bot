@@ -8,7 +8,7 @@ from train.rl import train_rl
 def main():
     states, values = prepare_dataset("../data/othello_dataset.csv")
     network = train_supervised(states, values, save_path="../output/supervised/network.pth")
-    train_rl("../output/rl/model.pth", policy_net=network, checkpoint_dir="../output/rl/checkpoints")
+    train_rl("../output/rl/model.pth", policy_net=network, checkpoint_dir="../output/rl/checkpoints", expert_data_path="../data/othello_dataset.csv")
 
 
 def convert():
