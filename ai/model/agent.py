@@ -76,7 +76,9 @@ class DqnAgent(object):
 
         q_values = self.policy_net(state_batch).gather(1, action_batch)
 
-        next_state_values = self.target_net(next_state_batch).max(1)[0].unsqueeze(1)
+        # Double DQN: Select action using policy net and evaluate it using target net
+        next_actions = self.policy_net(next_state_batch).argmax(1, keepdim=True)
+        next_state_values = self.target_net(next_state_batch).gather(1, next_actions)
 
         # Adjust sign if it's White's turn in next_state
         next_player_is_white = (next_state_batch[:, 3, 0, 0] == 0).float().unsqueeze(1)
