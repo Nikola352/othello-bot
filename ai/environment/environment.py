@@ -1,6 +1,7 @@
 from collections import deque
 
 import numpy as np
+from model.settings import GUIDED_REWARD_FACTOR
 from environment.constants import BLACK, EMPTY, WHITE
 from othello_engine import PyGameState as GameState
 
@@ -31,6 +32,9 @@ class EnvState(object):
         
         if self.is_final():
             return self.get_result() if -self.turn == BLACK else -self.get_result()
+        
+        return GUIDED_REWARD_FACTOR * self.reward_heuristic()
+
         return 0
 
     def skip_move(self):
@@ -49,6 +53,16 @@ class EnvState(object):
 
     def get_legal_moves_mask(self) -> np.ndarray:
         return self.game_state.get_legal_moves_mask()
+    
+    def get_stability_mask(self) -> tuple[np.ndarray, np.ndarray]:
+        return self.game_state.get_stability_mask()
+    
+    def reward_heuristic(self) -> float:
+        return (
+            3 * self.game_state.get_relative_corner_diff() + 
+            2 * self.game_state.get_relative_stability_diff() +
+            1 * self.game_state.get_relative_piece_diff()
+        ) / 6.0
     
     def copy(self) -> "EnvState":
         state = EnvState()

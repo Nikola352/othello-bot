@@ -71,6 +71,11 @@ impl GameState {
         Self::bitmask_to_matrix(mask)
     }
 
+    pub fn get_stability_mask(&self) -> (Vec<Vec<f32>>, Vec<Vec<f32>>) {
+        let (black, white) = self.board.get_stable_by_color();
+        (Self::bitmask_to_matrix(black), Self::bitmask_to_matrix(white))
+    }
+
     fn bitmask_to_matrix(mask: u64) -> Vec<Vec<f32>> {
         let mut board = vec![vec![0f32; BOARD_SIZE as usize]; BOARD_SIZE as usize];
 

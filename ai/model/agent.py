@@ -13,9 +13,11 @@ from model.settings import *
 
 
 class DqnAgent(object):
-    def __init__(self, device, policy_net=DeepQNetwork()):
+    def __init__(self, device, policy_net: DeepQNetwork | None = None):
         self.device = device
 
+        if policy_net is None:
+            policy_net = DeepQNetwork()
         self.policy_net = policy_net.to(device)
 
         self.target_net = DeepQNetwork().to(device)

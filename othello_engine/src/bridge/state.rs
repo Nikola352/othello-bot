@@ -88,6 +88,30 @@ impl PyGameState {
         Ok(PyArray2::from_vec2(py, &board)?)
     }
 
+    pub fn get_stability_mask<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<(Bound<'py, PyArray2<f32>>, Bound<'py, PyArray2<f32>>)> {
+        let (black_mask, white_mask) = self.inner.get_stability_mask();
+
+        let black_array = PyArray2::from_vec2(py, &black_mask)?;
+        let white_array = PyArray2::from_vec2(py, &white_mask)?;
+
+        Ok((black_array, white_array))
+    }
+
+    pub fn get_relative_piece_diff(&self) -> f32 {
+        self.inner.get_relative_piece_diff()
+    }
+
+    pub fn get_relative_corner_diff(&self) -> f32 {
+        self.inner.get_relative_corner_diff()
+    }
+
+    pub fn get_relative_stability_diff(&self) -> f32 {
+        self.inner.get_relative_stability_diff()
+    }
+
     /// String representation of the game state
     pub fn __str__(&self) -> String {
         format!("{:?}", self.inner)
@@ -104,7 +128,7 @@ impl PyGameState {
 
     pub fn clone(&self) -> Self {
         Self {
-            inner: self.inner.clone()
+            inner: self.inner.clone(),
         }
     }
 }

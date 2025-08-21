@@ -1,7 +1,8 @@
 use crate::othello::board::Piece::{Empty, Occupied};
 use crate::othello::color::Color;
 use crate::othello::color::Color::{Black, White};
-use crate::othello::mask_shift::{shift, DIRECTIONS};
+use crate::othello::mask_shift::Direction::*;
+use crate::othello::mask_shift::{shift, Direction, BOTTOM_ROW_MASK, DIRECTIONS, LEFT_COL_MASK, MAIN_DIAGONAL_MASK, MINOR_DIAGONAL_MASK, RIGHT_COL_MASK, TOP_ROW_MASK};
 use std::fmt;
 use std::fmt::Formatter;
 
@@ -89,7 +90,7 @@ impl OthelloBoard {
 
         for dir in DIRECTIONS {
             let mut flipped = shift(new_piece, dir) & opp_mask;
-            for _ in 0..BOARD_SIZE-2 {
+            for _ in 0..BOARD_SIZE - 2 {
                 flipped |= shift(flipped, dir) & opp_mask;
             }
             if shift(flipped, dir) & player_mask != 0 {
@@ -123,7 +124,7 @@ impl OthelloBoard {
 
         for dir in DIRECTIONS {
             let mut flippable = shift(player_mask, dir) & opp_mask;
-            for _ in 0..BOARD_SIZE-2 {
+            for _ in 0..BOARD_SIZE - 2 {
                 flippable |= shift(flippable, dir) & opp_mask;
             }
             legal_move_mask |= shift(flippable, dir) & !(player_mask | opp_mask);
@@ -147,6 +148,92 @@ impl OthelloBoard {
     pub fn get_score(&self) -> i32 {
         let (black_count, white_count) = self.piece_counts();
         black_count as i32 - white_count as i32
+    }
+
+    pub fn get_corner_counts(&self) -> (u32, u32) {
+        const CORNER_MASK: u64 = 0x8100000000000081;
+        let black = (self.black & CORNER_MASK).count_ones();
+        let white = (self.white & CORNER_MASK).count_ones();
+        (black, white)
+    }
+
+    pub fn get_stable_by_color(&self) -> (u64, u64) {
+        let mask = self.get_stable_pieces();
+        (mask & self.black, mask & self.white)
+    }
+
+    pub fn get_stable_pieces(&self) -> u64 {
+        let mut stable = 1u64;
+        let occupied = self.black | self.white;
+
+        // Occupancy pass
+        stable &= Self::stability_sweep(TOP_ROW_MASK, South, occupied);
+        stable &= Self::stability_sweep(LEFT_COL_MASK, East, occupied);
+        stable &= Self::stability_sweep(MAIN_DIAGONAL_MASK, NorthWest, occupied);
+        stable &= Self::stability_sweep(MAIN_DIAGONAL_MASK, SouthEast, occupied);
+        stable &= Self::stability_sweep(MINOR_DIAGONAL_MASK, NorthEast, occupied);
+        stable &= Self::stability_sweep(MINOR_DIAGONAL_MASK, SouthWest, occupied);
+
+        // Neighbour-based induction loop
+        let mut new_stable = stable;
+        loop {
+            stable = new_stable;
+
+            // Pieces adjacent to stable pieces on all sides are stable (regardless of color)
+            let horizontally = occupied
+                & (shift(stable, East) | LEFT_COL_MASK)
+                & (shift(stable, West) | RIGHT_COL_MASK);
+            let vertically = occupied
+                & (shift(stable, North) | BOTTOM_ROW_MASK)
+                & (shift(stable, South) | TOP_ROW_MASK);
+            let diagonally_main = occupied
+                & (shift(stable, NorthEast) | LEFT_COL_MASK | BOTTOM_ROW_MASK)
+                & (shift(stable, SouthWest) | RIGHT_COL_MASK | TOP_ROW_MASK);
+            let diagonally_minor = occupied
+                & (shift(stable, NorthWest) | RIGHT_COL_MASK | BOTTOM_ROW_MASK)
+                & (shift(stable, SouthEast) | LEFT_COL_MASK | TOP_ROW_MASK);
+            new_stable |= horizontally & vertically & diagonally_main & diagonally_minor;
+
+            // Pieces adjacent to a stable piece of the same color is stable
+            let horizontally =
+                ((shift(stable & self.black, East) | LEFT_COL_MASK)  & self.black) |
+                    ((shift(stable & self.black, West) | RIGHT_COL_MASK) & self.black) |
+                    ((shift(stable & self.white, East) | LEFT_COL_MASK)  & self.white) |
+                    ((shift(stable & self.white, West) | RIGHT_COL_MASK) & self.white);
+            let vertically =
+                ((shift(stable & self.black, North) | BOTTOM_ROW_MASK)  & self.black) |
+                    ((shift(stable & self.black, South) | TOP_ROW_MASK) & self.black) |
+                    ((shift(stable & self.white, North) | BOTTOM_ROW_MASK)  & self.white) |
+                    ((shift(stable & self.white, South) | TOP_ROW_MASK) & self.white);
+            let diagonally_main =
+                ((shift(stable & self.black, NorthEast) | LEFT_COL_MASK | BOTTOM_ROW_MASK)  & self.black) |
+                    ((shift(stable & self.black, SouthWest) | RIGHT_COL_MASK | TOP_ROW_MASK) & self.black) |
+                    ((shift(stable & self.white, NorthEast) | LEFT_COL_MASK | BOTTOM_ROW_MASK)  & self.white) |
+                    ((shift(stable & self.white, SouthWest) | RIGHT_COL_MASK | TOP_ROW_MASK) & self.white);
+            let diagonally_minor =
+                ((shift(stable & self.black, NorthWest) | RIGHT_COL_MASK | BOTTOM_ROW_MASK)  & self.black) |
+                    ((shift(stable & self.black, SouthEast) | LEFT_COL_MASK | TOP_ROW_MASK) & self.black) |
+                    ((shift(stable & self.white, NorthWest) | RIGHT_COL_MASK | BOTTOM_ROW_MASK)  & self.white) |
+                    ((shift(stable & self.white, SouthEast) | LEFT_COL_MASK | TOP_ROW_MASK) & self.white);
+            new_stable |= horizontally & vertically & diagonally_main & diagonally_minor;
+
+            if new_stable == stable {
+                break;
+            }
+        }
+
+        stable
+    }
+
+    fn stability_sweep(mut mask: u64, direction: Direction, occupied: u64) -> u64 {
+        let mut stable = 064;
+        while mask != 0u64 {
+            if occupied & mask == mask {
+                stable |= mask;
+            }
+            mask = shift(mask, direction);
+        }
+        stable
     }
 }
 
@@ -231,9 +318,9 @@ mod tests {
         board.play_move(&move_square, &Black);
 
         // e5 (row=4, col=4) should now be black
-        assert_eq!(board.get(&Square::new(4, 4)), Piece::Occupied(Black));
+        assert_eq!(board.get(&Square::new(4, 4)), Occupied(Black));
         // f5 should be black
-        assert_eq!(board.get(&Square::new(4, 5)), Piece::Occupied(Black));
+        assert_eq!(board.get(&Square::new(4, 5)), Occupied(Black));
 
         // White's count should have decreased, Black's increased
         let (b, w) = board.piece_counts();

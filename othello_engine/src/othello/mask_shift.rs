@@ -1,9 +1,11 @@
 use crate::othello::mask_shift::Direction::{East, North, NorthEast, NorthWest, South, SouthEast, SouthWest, West};
 
-const TOP_ROW_MASK: u64 = 0x00000000000000ffu64;
-const BOTTOM_ROW_MASK: u64 = 0xff00000000000000u64;
-const LEFT_COL_MASK: u64 = 0x0101010101010101u64;
-const RIGHT_COL_MASK: u64 = 0x8080808080808080u64;
+pub const TOP_ROW_MASK: u64 = 0x00000000000000ffu64;
+pub const BOTTOM_ROW_MASK: u64 = 0xff00000000000000u64;
+pub const LEFT_COL_MASK: u64 = 0x0101010101010101u64;
+pub const RIGHT_COL_MASK: u64 = 0x8080808080808080u64;
+pub const MAIN_DIAGONAL_MASK: u64 = 0x0000000000000000u64;
+pub const MINOR_DIAGONAL_MASK: u64 = 0x0000000000000000u64;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Direction {

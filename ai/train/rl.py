@@ -26,7 +26,7 @@ def train_rl(
         agent.load_model(start_checkpoint_path)
 
     if expert_data_path:
-        preload_expert_memory(agent, expert_data_path, max_games=17_000)
+        preload_expert_memory(agent, expert_data_path)
 
     losses = []
 

@@ -10,7 +10,7 @@ from environment.environment import EnvState
 class DeepQNetwork(nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv1 = nn.Conv2d(in_channels=8, out_channels=32, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv2d(in_channels=10, out_channels=32, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, padding=1)
         self.conv3 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
         self.fc4 = nn.Linear(in_features=64*8*8, out_features=512)
@@ -36,6 +36,8 @@ def state_to_tensor(state: EnvState) -> torch.Tensor:
 
     player_indicator = np.ones((8,8), dtype=np.float32) if state.turn == BLACK else np.zeros((8,8), dtype=np.float32)
 
+    black_stable, white_stable = state.get_stability_mask()
+
     # Previous states (always include 2 previous states, zero-padded if not available)
     prev_black1 = np.zeros((8, 8), dtype=np.float32)
     prev_white1 = np.zeros((8, 8), dtype=np.float32)
@@ -58,6 +60,7 @@ def state_to_tensor(state: EnvState) -> torch.Tensor:
         prev_black1, prev_white1,
         black_pieces, white_pieces,
         legal_moves,
+        black_stable, white_stable,
         player_indicator
     ])
 
