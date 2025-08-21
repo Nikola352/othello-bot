@@ -1,10 +1,11 @@
 use crate::othello::board::Piece::{Empty, Occupied};
 use crate::othello::color::Color;
 use crate::othello::color::Color::{Black, White};
+use crate::othello::mask_shift::{shift, DIRECTIONS};
 use std::fmt;
 use std::fmt::Formatter;
 
-pub(crate) const BOARD_SIZE: u8 = 8;
+pub const BOARD_SIZE: u8 = 8;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Square {
@@ -70,54 +71,65 @@ impl OthelloBoard {
     /// Execute a move: place a piece and flip all affected pieces.
     /// This is a low-level operation that assumes the move is legal.
     pub fn play_move(&mut self, square: &Square, turn: &Color) {
-        const DIRS: [(i16, i16); 8] = [
-            (-1, -1), (-1, 0), (-1, 1),
-            (0, -1),           (0, 1),
-            (1, -1),  (1, 0),  (1, 1),
-        ];
+        self.set(&square, Piece::from(turn));
 
-        self.set(square, Piece::from(turn));
+        let player_mask = match turn {
+            Black => self.black,
+            White => self.white,
+        };
+        let opp_mask = match turn {
+            Black => self.white,
+            White => self.black,
+        };
 
-        for dir in &DIRS {
-            let flips = self.get_flips_in_direction(square, *dir, turn);
-            for flip_sq in flips {
-                self.set(&flip_sq, Piece::from(turn))
+        let index = square.row * BOARD_SIZE + square.col;
+        let new_piece = 1u64 << index;
+
+        let mut flipped_piece_mask = 0u64;
+
+        for dir in DIRECTIONS {
+            let mut flipped = shift(new_piece, dir) & opp_mask;
+            for _ in 0..BOARD_SIZE-2 {
+                flipped |= shift(flipped, dir) & opp_mask;
+            }
+            if shift(flipped, dir) & player_mask != 0 {
+                flipped_piece_mask |= flipped;
+            }
+        }
+
+        match turn {
+            Black => {
+                self.black |= flipped_piece_mask;
+                self.white &= !flipped_piece_mask;
+            }
+            White => {
+                self.white |= flipped_piece_mask;
+                self.black &= !flipped_piece_mask;
             }
         }
     }
 
-    /// Get all pieces that would be flipped in a specific direction for a given move
-    fn get_flips_in_direction(
-        &self,
-        square: &Square,
-        (dr, dc): (i16, i16),
-        color: &Color,
-    ) -> Vec<Square> {
-        let mut flips = Vec::new();
-        let mut row = square.row as i16 + dr;
-        let mut col = square.col as i16 + dc;
+    pub fn get_legal_moves(&self, turn: &Color) -> u64 {
+        let player_mask = match turn {
+            Black => self.black,
+            White => self.white,
+        };
+        let opp_mask = match turn {
+            Black => self.white,
+            White => self.black,
+        };
 
-        // Collect potential flips
-        while Self::is_valid_position(row, col) {
-            let current_square = Square::from_int(row, col);
-            match self.get(&current_square) {
-                Occupied(piece_color) if piece_color != *color => {
-                    flips.push(current_square);
-                }
-                Occupied(_) => {
-                    // Found our own piece - this direction is valid
-                    return flips;
-                }
-                Empty => {
-                    // Hit empty space - this direction is invalid
-                    break;
-                }
+        let mut legal_move_mask = 0u64;
+
+        for dir in DIRECTIONS {
+            let mut flippable = shift(player_mask, dir) & opp_mask;
+            for _ in 0..BOARD_SIZE-2 {
+                flippable |= shift(flippable, dir) & opp_mask;
             }
-            row += dr;
-            col += dc;
+            legal_move_mask |= shift(flippable, dir) & !(player_mask | opp_mask);
         }
 
-        Vec::new()
+        legal_move_mask
     }
 
     pub fn with_move(&self, square: &Square, turn: &Color) -> OthelloBoard {
@@ -136,33 +148,11 @@ impl OthelloBoard {
         let (black_count, white_count) = self.piece_counts();
         black_count as i32 - white_count as i32
     }
-
-    pub fn is_valid_position(row: i16, col: i16) -> bool {
-        row >= 0 && row < BOARD_SIZE as i16 && col >= 0 && col < BOARD_SIZE as i16
-    }
 }
 
 impl Square {
     pub fn new(row: u8, col: u8) -> Square {
         Square { row, col }
-    }
-
-    /// Create Square from i16 coordinates (with bounds checking in debug mode)
-    pub fn from_int(row: i16, col: i16) -> Square {
-        debug_assert!(row >= 0 && row < BOARD_SIZE as i16);
-        debug_assert!(col >= 0 && col < BOARD_SIZE as i16);
-        Square {
-            row: row as u8,
-            col: col as u8,
-        }
-    }
-
-    pub fn row(&self) -> u8 {
-        self.row
-    }
-
-    pub fn col(&self) -> u8 {
-        self.col
     }
 }
 
@@ -200,5 +190,54 @@ impl fmt::Debug for OthelloBoard {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::othello::color::Color::{Black, White};
+
+    fn idx(row: u8, col: u8) -> u64 {
+        1u64 << (row * BOARD_SIZE + col)
+    }
+
+    #[test]
+    fn test_initial_legal_moves_black() {
+        let board = OthelloBoard::new();
+        let legal = board.get_legal_moves(&Black);
+
+        // Expected: c4, d3, e6, f5
+        let expected = idx(2, 3) | idx(3, 2) | idx(4, 5) | idx(5, 4);
+        assert_eq!(legal, expected, "Black initial legal moves wrong");
+    }
+
+    #[test]
+    fn test_initial_legal_moves_white() {
+        let board = OthelloBoard::new();
+        let legal = board.get_legal_moves(&White);
+
+        // Expected: c5, d6, e3, f4
+        let expected = idx(2, 4) | idx(3, 5) | idx(4, 2) | idx(5, 3);
+        assert_eq!(legal, expected, "White initial legal moves wrong");
+    }
+
+    #[test]
+    fn test_play_move_flips_correctly() {
+        let mut board = OthelloBoard::new();
+
+        // Black plays f5 (row=4, col=5)
+        let move_square = Square::new(4, 5);
+        board.play_move(&move_square, &Black);
+
+        // e5 (row=4, col=4) should now be black
+        assert_eq!(board.get(&Square::new(4, 4)), Piece::Occupied(Black));
+        // f5 should be black
+        assert_eq!(board.get(&Square::new(4, 5)), Piece::Occupied(Black));
+
+        // White's count should have decreased, Black's increased
+        let (b, w) = board.piece_counts();
+        assert_eq!(b, 4);
+        assert_eq!(w, 1);
     }
 }

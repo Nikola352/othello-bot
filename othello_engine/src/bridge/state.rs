@@ -24,11 +24,7 @@ impl PyGameState {
 
     /// Get legal moves as a list of tuples (row, col)
     pub fn get_legal_moves(&self) -> Vec<(u8, u8)> {
-        self.inner
-            .get_legal_moves()
-            .iter()
-            .map(square_to_tuple)
-            .collect()
+        self.inner.get_legal_moves()
     }
 
     /// Play a move given coordinates (row, col)
@@ -88,11 +84,7 @@ impl PyGameState {
         &self,
         py: Python<'py>,
     ) -> PyResult<Bound<'py, PyArray2<f32>>> {
-        let legal_moves = self.inner.get_legal_moves();
-        let mut board = vec![vec![0f32; BOARD_SIZE as usize]; BOARD_SIZE as usize];
-        for square in legal_moves {
-            board[square.row as usize][square.col as usize] = 1f32;
-        }
+        let board = self.inner.get_legal_moves_mask();
         Ok(PyArray2::from_vec2(py, &board)?)
     }
 
@@ -118,10 +110,6 @@ impl PyGameState {
 }
 
 // Helper functions for type conversion
-fn square_to_tuple(square: &Square) -> (u8, u8) {
-    (square.row(), square.col())
-}
-
 fn color_to_int(color: Color) -> i8 {
     match color {
         Black => 1,

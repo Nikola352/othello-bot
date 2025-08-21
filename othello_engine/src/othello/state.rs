@@ -1,4 +1,4 @@
-use crate::othello::board::{OthelloBoard, Piece, Square};
+use crate::othello::board::{OthelloBoard, Square, BOARD_SIZE};
 use crate::othello::color::Color;
 use crate::othello::color::Color::{Black, White};
 
@@ -16,63 +16,19 @@ impl GameState {
         }
     }
 
-    pub fn get_legal_moves(&self) -> Vec<Square> {
-        let mut moves: Vec<Square> = Vec::new();
+    pub fn get_legal_moves(&self) -> Vec<(u8, u8)> {
+        let mask = self.board.get_legal_moves(&self.turn);
 
-        for i in 0..crate::othello::board::BOARD_SIZE {
-            moves.extend(self.get_moves_in_dir((i, 0), (0, 1)));
-            moves.extend(self.get_moves_in_dir((0, i), (1, 0)));
-            moves.extend(self.get_moves_in_dir((i, 0), (1, 1)));
-            moves.extend(self.get_moves_in_dir((0, i), (1, 1)));
-            moves.extend(self.get_moves_in_dir((0, i), (1, -1)));
-            moves
-                .extend(self.get_moves_in_dir((i, crate::othello::board::BOARD_SIZE - 1), (1, -1)));
-            moves
-                .extend(self.get_moves_in_dir((i, crate::othello::board::BOARD_SIZE - 1), (0, -1)));
-            moves
-                .extend(self.get_moves_in_dir((crate::othello::board::BOARD_SIZE - 1, i), (-1, 0)));
-            moves.extend(
-                self.get_moves_in_dir((i, crate::othello::board::BOARD_SIZE - 1), (-1, -1)),
-            );
-            moves.extend(
-                self.get_moves_in_dir((crate::othello::board::BOARD_SIZE - 1, i), (-1, -1)),
-            );
-            moves
-                .extend(self.get_moves_in_dir((crate::othello::board::BOARD_SIZE - 1, i), (-1, 1)));
-            moves.extend(self.get_moves_in_dir((i, 0), (-1, 1)));
+        let mut moves: Vec<(u8, u8)> = Vec::new();
+
+        for row in 0..BOARD_SIZE {
+            for col in 0..BOARD_SIZE {
+                if mask & (1u64 << row*BOARD_SIZE + col) != 0 {
+                    moves.push((row, col))
+                }
+            }
         }
 
-        moves
-    }
-
-    /// Get all possible moves on a straight line starting at (row, col) in the direction of delta
-    fn get_moves_in_dir(&self, start: (u8, u8), delta: (i8, i8)) -> Vec<Square> {
-        let mut moves: Vec<Square> = Vec::new();
-        let mut seen_my_before = false;
-        let mut seen_opponent = false;
-        let mut row = start.0 as i16;
-        let mut col = start.1 as i16;
-        while OthelloBoard::is_valid_position(row, col) {
-            match &self.board.get(&Square::from_int(row, col)) {
-                Piece::Occupied(col) if *col == self.turn => {
-                    seen_my_before = true;
-                }
-                Piece::Occupied(_) => {
-                    if seen_my_before {
-                        seen_opponent = true;
-                    }
-                }
-                Piece::Empty => {
-                    if seen_opponent {
-                        moves.push(Square::from_int(row, col))
-                    }
-                    seen_my_before = false;
-                    seen_opponent = false;
-                }
-            };
-            row += delta.0 as i16;
-            col += delta.1 as i16;
-        }
         moves
     }
 
@@ -108,5 +64,24 @@ impl GameState {
             score if score < 0 => Some(White),
             _ => None,
         }
+    }
+
+    pub fn get_legal_moves_mask(&self) -> Vec<Vec<f32>> {
+        let mask = self.board.get_legal_moves(&self.turn);
+        Self::bitmask_to_matrix(mask)
+    }
+
+    fn bitmask_to_matrix(mask: u64) -> Vec<Vec<f32>> {
+        let mut board = vec![vec![0f32; BOARD_SIZE as usize]; BOARD_SIZE as usize];
+
+        for row in 0..BOARD_SIZE {
+            for col in 0..BOARD_SIZE {
+                if mask & (1u64 << row*BOARD_SIZE + col) != 0 {
+                    board[row as usize][col as usize] = 1f32;
+                }
+            }
+        }
+
+        board
     }
 }
