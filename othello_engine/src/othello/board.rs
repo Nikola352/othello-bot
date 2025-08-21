@@ -163,6 +163,11 @@ impl OthelloBoard {
     }
 
     pub fn get_stable_pieces(&self) -> u64 {
+        const QUICK_EXIT_MASK: u64 = 0xC3810000000081C3;
+        if QUICK_EXIT_MASK & (self.black | self.white) == 0 {
+            return 0u64;
+        }
+
         let mut stable = 1u64;
         let occupied = self.black | self.white;
 
