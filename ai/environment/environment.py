@@ -33,9 +33,10 @@ class EnvState(object):
         if self.is_final():
             return self.get_result() if -self.turn == BLACK else -self.get_result()
         
-        return GUIDED_REWARD_FACTOR * self.reward_heuristic()
-
-        return 0
+        heuristic_reward = GUIDED_REWARD_FACTOR * self.reward_heuristic()
+        if -self.turn == WHITE:
+            heuristic_reward = -heuristic_reward
+        return heuristic_reward
 
     def skip_move(self):
         self.prev_states.append(self.copy())

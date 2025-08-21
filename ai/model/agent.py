@@ -6,6 +6,7 @@ import torch
 import torch.optim as optim
 import torch.nn.functional as F
 
+from environment.constants import BLACK
 from environment.environment import EnvState
 from model.network import DeepQNetwork, state_to_tensor
 from model.replay_memory import ReplayMemory
@@ -60,6 +61,7 @@ class DqnAgent(object):
             reward,
             state_to_tensor(next_state),
             next_state.is_final(),
+            1 if state.turn == BLACK else -1,
         ))
 
     def optimize(self):
@@ -68,27 +70,20 @@ class DqnAgent(object):
 
         transitions = self.memory.sample(EXP_REPLAY_BATCH_SIZE)
         
-        states, actions, rewards, next_states, dones = zip(*transitions)
+        states, actions, rewards, next_states, dones, turns = zip(*transitions)
         
         state_batch = torch.stack(states).to(self.device)
         action_batch = torch.tensor(actions, dtype=torch.int64, device=self.device).unsqueeze(1)
         reward_batch = torch.tensor(rewards, dtype=torch.float32, device=self.device).unsqueeze(1)
         next_state_batch = torch.stack(next_states).to(self.device)
         done_batch = torch.tensor(dones, dtype=torch.float32, device=self.device).unsqueeze(1)
+        turn_batch = torch.tensor(turns, dtype=torch.float32, device=self.device).unsqueeze(1)
 
         q_values = self.policy_net(state_batch).gather(1, action_batch)
 
-        # Double DQN: Select action using policy net and evaluate it using target net
-        next_actions = self.policy_net(next_state_batch).argmax(1, keepdim=True)
-        next_state_values = self.target_net(next_state_batch).gather(1, next_actions)
+        next_state_values = self.target_net(next_state_batch).max(1)[0].unsqueeze(1)
 
-        # Adjust sign if it's White's turn in next_state
-        next_player_is_white = (next_state_batch[:, 3, 0, 0] == 0).float().unsqueeze(1)
-        sign = torch.where(next_player_is_white == 1, -1.0, 1.0)
-
-        next_state_values = next_state_values * sign
-
-        expected_q_values = reward_batch + (1-done_batch) * GAMMA * next_state_values
+        expected_q_values = reward_batch + (1-done_batch) * (-turn_batch) * GAMMA * next_state_values
         
         loss = F.smooth_l1_loss(input=q_values, target=expected_q_values)
 
