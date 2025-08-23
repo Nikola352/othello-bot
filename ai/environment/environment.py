@@ -34,6 +34,8 @@ class EnvState(object):
             return self.get_result() if -self.turn == BLACK else -self.get_result()
         
         heuristic_reward = GUIDED_REWARD_FACTOR * self.reward_heuristic()
+        if self.prev_states:
+            heuristic_reward -= GUIDED_REWARD_FACTOR * self.prev_states[-1].reward_heuristic()
         if -self.turn == WHITE:
             heuristic_reward = -heuristic_reward
         return heuristic_reward

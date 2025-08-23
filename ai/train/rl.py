@@ -14,7 +14,7 @@ from environment.environment import EnvState
 def train_rl(
         save_path: str,
         start_checkpoint_path: str = None, 
-        start_episode = 0, 
+        start_episode = 1, 
         checkpoint_dir: str = None, 
         policy_net: DeepQNetwork = None,
         expert_data_path: str = None,
@@ -30,7 +30,7 @@ def train_rl(
 
     losses = []
 
-    for episode in range(start_episode, EPISODES):
+    for episode in range(start_episode, EPISODES+1):
         eps = END_EPS + (START_EPS - END_EPS) * np.exp(-1.0 * episode / EPS_DECAY)
         total_reward = 0.0
 
@@ -54,12 +54,12 @@ def train_rl(
         if episode % TARGET_LIFESPAN == 0:
             agent.update_target()
 
-        if episode % 5000 == 0:
+        if episode % 1000 == 0:
             avg_loss = np.mean(losses[-1000:]) if losses else 0
             print(f"EP {episode:5d} | eps={eps:.3f} | avg_loss={avg_loss:.4f} | mem={len(agent.memory)}")
 
-            if checkpoint_dir:
-                agent.save_model(os.path.join(checkpoint_dir, f"checkpoint_{episode:05d}.pth"))
+        if episode % 5000 == 0 and checkpoint_dir:
+            agent.save_model(os.path.join(checkpoint_dir, f"checkpoint_{episode:05d}.pth"))
 
     # Save to disk
     agent.save_model(os.path.join(checkpoint_dir, f"checkpoint_final.pth"))
