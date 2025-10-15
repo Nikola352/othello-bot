@@ -2,30 +2,216 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from typing import Tuple
 from environment.constants import BLACK, WHITE
 from environment.environment import EnvState
 
 
-class DeepQNetwork(nn.Module):
+class PolicyNetwork(nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv1 = nn.Conv2d(in_channels=10, out_channels=32, kernel_size=3, padding=1)
-        self.conv2 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, padding=1)
-        self.conv3 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
-        self.fc4 = nn.Linear(in_features=64*8*8, out_features=512)
-        self.fc5 = nn.Linear(in_features=512, out_features=8*8)
-
+        
+        # Convolutional layers
+        self.conv1 = nn.Conv2d(in_channels=10, out_channels=32, kernel_size=5, padding=2)
+        self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
+        self.conv3 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1)
+        self.conv4 = nn.Conv2d(in_channels=128, out_channels=128, kernel_size=3, padding=1)
+        self.conv5 = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=3, padding=1)
+        
+        # Policy head - maps spatial features to move probabilities
+        self.policy_conv = nn.Conv2d(in_channels=64, out_channels=2, kernel_size=1)
+        self.policy_fc = nn.Linear(in_features=2*8*8, out_features=64)
+        
     def forward(self, x):
+        # Feature extraction
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
         x = F.relu(self.conv3(x))
+        x = F.relu(self.conv4(x))
+        x = F.relu(self.conv5(x))
+        
+        # Policy head
+        x = F.relu(self.policy_conv(x))
         x = x.view(x.size(0), -1)
-        x = F.relu(self.fc4(x))
-        return self.fc5(x)
+        logits = self.policy_fc(x)
+        
+        return logits
+    
+    def predict_probs(self, x, legal_moves_mask=None):
+        logits = self.forward(x)
+        
+        if legal_moves_mask is not None:
+            # Mask illegal moves before softmax
+            logits = logits + (legal_moves_mask - 1) * 1e9
+        
+        probs = F.softmax(logits, dim=1)
+        return probs
+
+
+class ValueNetwork(nn.Module):
+    def __init__(self):
+        super().__init__()
+        
+        # Convolutional layers with batch normalization
+        self.conv1 = nn.Conv2d(in_channels=10, out_channels=32, kernel_size=5, padding=2)
+        self.bn1 = nn.BatchNorm2d(32)
+        
+        self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(64)
+        
+        self.conv3 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1)
+        self.bn3 = nn.BatchNorm2d(128)
+        
+        self.conv4 = nn.Conv2d(in_channels=128, out_channels=128, kernel_size=3, padding=1)
+        self.bn4 = nn.BatchNorm2d(128)
+        
+        self.conv5 = nn.Conv2d(in_channels=128, out_channels=128, kernel_size=3, padding=1)
+        self.bn5 = nn.BatchNorm2d(128)
+        
+        self.conv6 = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=3, padding=1)
+        self.bn6 = nn.BatchNorm2d(64)
+        
+        # Value head - reduces to single scalar
+        self.value_conv = nn.Conv2d(in_channels=64, out_channels=1, kernel_size=1)
+        self.value_fc1 = nn.Linear(in_features=8*8, out_features=256)
+        self.value_fc2 = nn.Linear(in_features=256, out_features=1)
+        
+    def forward(self, x):
+        # Feature extraction with batch normalization
+        x = F.relu(self.bn1(self.conv1(x)))
+        x = F.relu(self.bn2(self.conv2(x)))
+        x = F.relu(self.bn3(self.conv3(x)))
+        x = F.relu(self.bn4(self.conv4(x)))
+        x = F.relu(self.bn5(self.conv5(x)))
+        x = F.relu(self.bn6(self.conv6(x)))
+        
+        # Value head
+        x = F.relu(self.value_conv(x))
+        x = x.view(x.size(0), -1)
+        x = F.relu(self.value_fc1(x))
+        value = torch.tanh(self.value_fc2(x))
+        
+        return value
+
+
+class AlphaGoZeroNetwork(nn.Module):
+    """
+    Combined policy-value network similar to AlphaGo Zero / AlphaZero.
+    Shares convolutional backbone, then splits into policy and value heads.
+    
+    This is the architecture you'd use after supervised pretraining,
+    when moving to pure RL with MCTS.
+    
+    Architecture decisions:
+    - Shared trunk: More efficient, learns unified representations
+    - Batch normalization throughout (standard for AlphaZero-style networks)
+    - Residual blocks for deeper network without degradation
+    """
+    def __init__(self, num_residual_blocks=5):
+        super().__init__()
+        
+        # Initial convolution
+        self.conv_input = nn.Conv2d(in_channels=10, out_channels=128, kernel_size=3, padding=1)
+        self.bn_input = nn.BatchNorm2d(128)
+        
+        # Residual tower
+        self.residual_blocks = nn.ModuleList([
+            ResidualBlock(128) for _ in range(num_residual_blocks)
+        ])
+        
+        # Policy head
+        self.policy_conv = nn.Conv2d(in_channels=128, out_channels=2, kernel_size=1)
+        self.policy_bn = nn.BatchNorm2d(2)
+        self.policy_fc = nn.Linear(in_features=2*8*8, out_features=64)
+        
+        # Value head
+        self.value_conv = nn.Conv2d(in_channels=128, out_channels=1, kernel_size=1)
+        self.value_bn = nn.BatchNorm2d(1)
+        self.value_fc1 = nn.Linear(in_features=8*8, out_features=256)
+        self.value_fc2 = nn.Linear(in_features=256, out_features=1)
+        
+    def forward(self, x) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Args:
+            x: tensor of shape (batch, 10, 8, 8)
+        
+        Returns:
+            policy_logits: tensor of shape (batch, 65)
+            value: tensor of shape (batch, 1) in [-1, 1]
+        """
+        # Shared backbone
+        x = F.relu(self.bn_input(self.conv_input(x)))
+        
+        for block in self.residual_blocks:
+            x = block(x)
+        
+        # Policy head
+        p = F.relu(self.policy_bn(self.policy_conv(x)))
+        p = p.view(p.size(0), -1)
+        policy_logits = self.policy_fc(p)
+        
+        # Value head
+        v = F.relu(self.value_bn(self.value_conv(x)))
+        v = v.view(v.size(0), -1)
+        v = F.relu(self.value_fc1(v))
+        value = torch.tanh(self.value_fc2(v))
+        
+        return policy_logits, value
+    
+    def predict_probs_and_value(self, x, legal_moves_mask=None):
+        """
+        Get probability distribution and value estimate.
+        
+        Args:
+            x: tensor of shape (batch, 10, 8, 8)
+            legal_moves_mask: optional tensor of shape (batch, 65)
+        
+        Returns:
+            probs: tensor of shape (batch, 65)
+            value: tensor of shape (batch, 1)
+        """
+        policy_logits, value = self.forward(x)
+        
+        if legal_moves_mask is not None:
+            policy_logits = policy_logits + (legal_moves_mask - 1) * 1e9
+        
+        probs = F.softmax(policy_logits, dim=1)
+        return probs, value
+
+
+class ResidualBlock(nn.Module):
+    """
+    Residual block with batch normalization.
+    Architecture: Conv -> BN -> ReLU -> Conv -> BN -> Add -> ReLU
+    """
+    def __init__(self, channels):
+        super().__init__()
+        self.conv1 = nn.Conv2d(channels, channels, kernel_size=3, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(channels)
+        self.conv2 = nn.Conv2d(channels, channels, kernel_size=3, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(channels)
+        
+    def forward(self, x):
+        residual = x
+        x = F.relu(self.bn1(self.conv1(x)))
+        x = self.bn2(self.conv2(x))
+        x = x + residual
+        x = F.relu(x)
+        return x
 
 
 def state_to_tensor(state: EnvState) -> torch.Tensor:
+    """
+    Convert game state to neural network input tensor.
+    
+    Input channels (10 total):
+    - 0-1: Previous state t-2 (black, white)
+    - 2-3: Previous state t-1 (black, white)
+    - 4-5: Current state (black, white)
+    - 6: Legal moves mask
+    - 7-8: Stable pieces (black, white)
+    - 9: Current player indicator
+    """
     board = state.board
 
     # Current state channels

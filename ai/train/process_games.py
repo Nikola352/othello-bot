@@ -1,7 +1,7 @@
 from string import ascii_lowercase
 import pandas as pd
 
-from model.agent import DqnAgent
+from model.agent import ActorCriticAgent
 from environment.environment import EnvState
 from model.network import state_to_tensor
 
@@ -32,7 +32,7 @@ def prepare_dataset(data_path: str):
     return states, actions
 
 
-def preload_expert_memory(agent: DqnAgent, data_path: str, max_games: int = None):
+def preload_expert_memory(agent: ActorCriticAgent, data_path: str, max_games: int = None):
     """Fill replay memory with expert game trajectories"""
     df = pd.read_csv(data_path)
     if max_games:

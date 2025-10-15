@@ -1,58 +1,43 @@
 import os
-from pathlib import Path
 import random
 import numpy as np
 import torch
-import torch.optim as optim
 import torch.nn.functional as F
-
+import torch.optim as optim
+from pathlib import Path
 from environment.constants import BLACK
-from environment.environment import EnvState
-from model.network import DeepQNetwork, state_to_tensor
+from model.network import PolicyNetwork, ValueNetwork, state_to_tensor
 from model.replay_memory import ReplayMemory
-from model.settings import *
+from model.settings import GAMMA, ACTOR_LR, REPLAY_CAP, EXP_REPLAY_BATCH_SIZE
 
 
-class DqnAgent(object):
-    def __init__(self, device, policy_net: DeepQNetwork | None = None):
+class ActorCriticAgent:
+    def __init__(self, device, policy_net=None, value_net=None):
         self.device = device
 
-        if policy_net is None:
-            policy_net = DeepQNetwork()
-        self.policy_net = policy_net.to(device)
-
-        self.target_net = DeepQNetwork().to(device)
-        self.target_net.load_state_dict(self.policy_net.state_dict())
-        self.target_net.eval()
+        self.policy_net = (policy_net or PolicyNetwork()).to(device)
+        self.value_net = (value_net or ValueNetwork()).to(device)
 
         self.memory = ReplayMemory(REPLAY_CAP)
 
-        self.optimizer = optim.Adam(self.policy_net.parameters(), lr=RL_LR)
+        self.policy_optimizer = optim.Adam(self.policy_net.parameters(), lr=ACTOR_LR)
+        self.value_optimizer = optim.Adam(self.value_net.parameters(), lr=ACTOR_LR)
 
-    def select_action(self, state: EnvState, eps: float):
+    def select_action(self, state, eps=0.0):
         """Select an action using ε-greedy strategy"""
         legal_moves = state.get_available_actions()
         if not legal_moves:
             return None
-        
+
         if random.random() < eps:
             return random.choice(legal_moves)
-        
+
         state_tensor = state_to_tensor(state).unsqueeze(0).to(self.device)
         with torch.no_grad():
-            q_vals = self.policy_net(state_tensor).cpu().numpy().flatten()
+            probs = self.policy_net.predict_probs(state_tensor, legal_moves_mask=legal_moves)
 
-        # Mask illegal moves
-        mask = np.full(8*8, -np.inf, dtype=np.float32)
-        for x, y in legal_moves:
-            mask[x*8 + y] = q_vals[x*8 + y]
-
-        max_idx = np.argmax(mask)
-        return (max_idx // 8, max_idx % 8)
-    
-    def select_optimal_action(self, state: EnvState) -> tuple[int, int]:
-        """Select an action using the optimal strategy"""
-        return self.select_action(state, eps=0.0)
+        action_index = np.random.choice(np.arange(8 * 8), p=probs)
+        return (action_index // 8, action_index % 8)
 
     def add_to_memory(self, state, action, reward, next_state):
         self.memory.add((
@@ -66,66 +51,68 @@ class DqnAgent(object):
 
     def optimize(self):
         if len(self.memory) < EXP_REPLAY_BATCH_SIZE:
-            return
+            return None
 
         transitions = self.memory.sample(EXP_REPLAY_BATCH_SIZE)
-        
         states, actions, rewards, next_states, dones, turns = zip(*transitions)
-        
+
         state_batch = torch.stack(states).to(self.device)
-        action_batch = torch.tensor(actions, dtype=torch.int64, device=self.device).unsqueeze(1)
-        reward_batch = torch.tensor(rewards, dtype=torch.float32, device=self.device).unsqueeze(1)
         next_state_batch = torch.stack(next_states).to(self.device)
+        action_batch = torch.tensor(actions, dtype=torch.long, device=self.device)
+        reward_batch = torch.tensor(rewards, dtype=torch.float32, device=self.device).unsqueeze(1)
         done_batch = torch.tensor(dones, dtype=torch.float32, device=self.device).unsqueeze(1)
         turn_batch = torch.tensor(turns, dtype=torch.float32, device=self.device).unsqueeze(1)
 
-        q_values = self.policy_net(state_batch).gather(1, action_batch)
+        # --- Critic ---
+        values = self.value_net(state_batch)
+        with torch.no_grad():
+            next_state_values = self.value_net(next_state_batch)
+            target_values = reward_batch + (1-done_batch) * (-turn_batch) * GAMMA * next_state_values
+        advantages = target_values - values
 
-        next_state_values = self.target_net(next_state_batch).max(1)[0].unsqueeze(1)
+        critic_loss = advantages.pow(2).mean()
 
-        expected_q_values = reward_batch + (1-done_batch) * (-turn_batch) * GAMMA * next_state_values
-        
-        loss = F.smooth_l1_loss(input=q_values, target=expected_q_values)
+        # --- Actor ---
+        logits = self.policy_net(state_batch)
+        log_probs = F.log_softmax(logits, dim=1)
+        selected_log_probs = log_probs.gather(1, action_batch.unsqueeze(1))
 
-        self.optimizer.zero_grad()
-        loss.backward()
+        actor_loss = -(selected_log_probs * advantages.detach()).mean()
+
+        # Backprop
+        self.policy_optimizer.zero_grad()
+        actor_loss.backward()
         torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), 1.0)
-        self.optimizer.step()
+        self.policy_optimizer.step()
 
-        return loss
+        self.value_optimizer.zero_grad()
+        critic_loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.value_net.parameters(), 1.0)
+        self.value_optimizer.step()
 
-    def update_target(self):
-        self.target_net.load_state_dict(self.policy_net.state_dict())
+        return actor_loss, critic_loss
 
     def save_model(self, path: str):
-        # Create directory if it doesn't exist
         Path(path).parent.mkdir(parents=True, exist_ok=True)
-        
         checkpoint = {
-            'policy_net_state_dict': self.policy_net.state_dict(),
-            'target_net_state_dict': self.target_net.state_dict(),
-            'optimizer_state_dict': self.optimizer.state_dict(),
+            'policy_net': self.policy_net.state_dict(),
+            'value_net': self.value_net.state_dict(),
+            'policy_opt': self.policy_optimizer.state_dict(),
+            'value_opt': self.value_optimizer.state_dict(),
         }
         torch.save(checkpoint, path)
 
     def load_model(self, path: str):
-        if not os.path.exists(path):
-            raise FileNotFoundError(f"Model file not found: {path}")
-        
-        checkpoint = torch.load(path, map_location=self.device, weights_only=True)
-        self.policy_net.load_state_dict(checkpoint['policy_net_state_dict'])
-        self.target_net.load_state_dict(checkpoint['target_net_state_dict'])
-        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        checkpoint = torch.load(path, map_location=self.device, weights_only=False)
+        self.policy_net.load_state_dict(checkpoint['policy_net'])
+        self.value_net.load_state_dict(checkpoint['value_net'])
+        self.policy_optimizer.load_state_dict(checkpoint['policy_opt'])
+        self.value_optimizer.load_state_dict(checkpoint['value_opt'])
 
-    @classmethod
-    def load_for_inference(cls, model_path: str, device=None):
-        if device is None:
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
-        agent = cls(device)
-        agent.load_model(model_path)
-        agent.policy_net.eval()
-        return agent
+    def load_policy_net(self, path: str):
+        checkpoint = torch.load(path, map_location=self.device, weights_only=False)
+        self.policy_net.load_state_dict(checkpoint['model_state_dict'])
+        self.policy_optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
     def save_policy_net(self, path: str):
         Path(path).parent.mkdir(parents=True, exist_ok=True)
