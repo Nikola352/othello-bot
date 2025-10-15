@@ -36,7 +36,7 @@ class ActorCriticAgent:
 
         state_tensor = state_to_tensor(state).unsqueeze(0).to(self.device)
         with torch.no_grad():
-            probs = self.policy_net.predict_probs(state_tensor, legal_moves_mask=legal_moves)
+            probs = self.policy_net.predict_probs(state_tensor, legal_moves_mask=state.get_legal_moves_mask())
 
         action_index = np.random.choice(np.arange(8 * 8), p=probs)
         return (action_index // 8, action_index % 8)
