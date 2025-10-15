@@ -12,7 +12,7 @@ from model.settings import GAMMA, ACTOR_LR, REPLAY_CAP, EXP_REPLAY_BATCH_SIZE
 
 
 class ActorCriticAgent:
-    def __init__(self, device, policy_net=None, value_net=None):
+    def __init__(self, device, policy_net=None, value_net=None, actor_frozen=False):
         self.device = device
 
         self.policy_net = (policy_net or PolicyNetwork()).to(device)
@@ -22,6 +22,8 @@ class ActorCriticAgent:
 
         self.policy_optimizer = optim.Adam(self.policy_net.parameters(), lr=ACTOR_LR)
         self.value_optimizer = optim.Adam(self.value_net.parameters(), lr=ACTOR_LR)
+
+        self.actor_frozen = actor_frozen
 
     def select_action(self, state, eps=0.0):
         """Select an action using ε-greedy strategy"""
@@ -80,10 +82,11 @@ class ActorCriticAgent:
         actor_loss = -(selected_log_probs * advantages.detach()).mean()
 
         # Backprop
-        self.policy_optimizer.zero_grad()
-        actor_loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), 1.0)
-        self.policy_optimizer.step()
+        if not self.actor_frozen:
+            self.policy_optimizer.zero_grad()
+            actor_loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), 1.0)
+            self.policy_optimizer.step()
 
         self.value_optimizer.zero_grad()
         critic_loss.backward()

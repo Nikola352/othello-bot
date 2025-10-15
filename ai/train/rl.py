@@ -21,7 +21,7 @@ def train_rl(
     ):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    agent = ActorCriticAgent(device, policy_net=policy_net)
+    agent = ActorCriticAgent(device, policy_net=policy_net, actor_frozen=True)
     if start_checkpoint_path and os.path.exists(start_checkpoint_path):
         agent.load_policy_net(start_checkpoint_path)
 
