@@ -38,7 +38,7 @@ class ActorCriticAgent:
         with torch.no_grad():
             probs = self.policy_net.predict_probs(state_tensor, legal_moves_mask=state.get_legal_moves_mask())
 
-        action_index = np.random.choice(np.arange(8 * 8), p=probs)
+        action_index = np.random.choice(np.arange(8 * 8), p=probs.squeeze(0).cpu().numpy())
         return (action_index // 8, action_index % 8)
 
     def add_to_memory(self, state, action, reward, next_state):
