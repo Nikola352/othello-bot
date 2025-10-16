@@ -18,12 +18,16 @@ def train_rl(
         checkpoint_dir: str = None, 
         policy_net: PolicyNetwork = None,
         expert_data_path: str = None,
+        start_from_policy: bool = True,
     ):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     agent = ActorCriticAgent(device, policy_net=policy_net, actor_frozen=True)
     if start_checkpoint_path and os.path.exists(start_checkpoint_path):
-        agent.load_policy_net(start_checkpoint_path)
+        if start_from_policy:
+            agent.load_policy_net(start_checkpoint_path)
+        else:
+            agent.load_model(start_checkpoint_path)
 
     if expert_data_path:
         preload_expert_memory(agent, expert_data_path)
