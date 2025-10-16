@@ -43,10 +43,15 @@ class PolicyNetwork(nn.Module):
         if legal_moves_mask is not None:
             if isinstance(legal_moves_mask, np.ndarray):
                 legal_moves_mask = torch.tensor(legal_moves_mask, dtype=torch.float32, device=logits.device)
-            elif legal_moves_mask.device != logits.device:
+            else:
                 legal_moves_mask = legal_moves_mask.to(logits.device)
-        
-        logits = logits + (legal_moves_mask - 1) * 1e9
+
+            if legal_moves_mask.dim() == 2:
+                legal_moves_mask = legal_moves_mask.flatten().unsqueeze(0)
+            elif legal_moves_mask.dim() == 3:
+                legal_moves_mask = legal_moves_mask.view(legal_moves_mask.size(0), -1)
+
+            logits = logits + (legal_moves_mask - 1) * 1e9
         
         probs = F.softmax(logits, dim=1)
         return probs
