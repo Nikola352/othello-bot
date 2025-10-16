@@ -8,7 +8,7 @@ from pathlib import Path
 from environment.constants import BLACK
 from model.network import PolicyNetwork, ValueNetwork, state_to_tensor
 from model.replay_memory import ReplayMemory
-from model.settings import GAMMA, ACTOR_LR, REPLAY_CAP, EXP_REPLAY_BATCH_SIZE
+from model.settings import CRITIC_LR, GAMMA, ACTOR_LR, REPLAY_CAP, EXP_REPLAY_BATCH_SIZE
 
 
 class ActorCriticAgent:
@@ -21,7 +21,7 @@ class ActorCriticAgent:
         self.memory = ReplayMemory(REPLAY_CAP)
 
         self.policy_optimizer = optim.Adam(self.policy_net.parameters(), lr=ACTOR_LR)
-        self.value_optimizer = optim.Adam(self.value_net.parameters(), lr=ACTOR_LR)
+        self.value_optimizer = optim.Adam(self.value_net.parameters(), lr=CRITIC_LR)
 
         self.actor_frozen = actor_frozen
 
