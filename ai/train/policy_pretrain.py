@@ -1,4 +1,3 @@
-import os
 import json
 from pathlib import Path
 from typing import Optional, Tuple, Dict
@@ -220,7 +219,7 @@ def save_checkpoint(network: nn.Module, optimizer: optim.Optimizer,
         torch.save(network.state_dict(), checkpoint_path.parent / 'best_model_state_dict.pt')
 
 
-def train_supervised(states, actions, 
+def pretrain_policy_network(states, actions, 
                     save_path: Optional[str] = None,
                     train_split: float = 0.7,
                     val_split: float = 0.15,
