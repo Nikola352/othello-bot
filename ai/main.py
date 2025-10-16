@@ -1,10 +1,11 @@
 from matplotlib import pyplot as plt
 import torch
-from ai.train.combine_checkpoints import combine_pretrained_checkpoints
+from train.combine_checkpoints import combine_pretrained_checkpoints
 from train.value_pretrain import pretrain_value_network
 from train.process_games import prepare_dataset
 from train.policy_pretrain import pretrain_policy_network
 from train.rl import train_rl
+from train.evaluation import *
 
 
 def main():
@@ -15,13 +16,20 @@ def main():
 
     _, checkpoint_path = combine_pretrained_checkpoints(
         policy_checkpoint_path=policy_result['run_dir'] / "checkpoints" / "best_model.pt",
-        value_checkpoint_path=value_result['run_dir'] / "checkpoints" / "best_model.pt",
+        value_checkpoint_path=value_result['run_dir'] / "checkpoints" / "best_value_model.pt",
         output_path='../output/pretrained_agent.pt',
         device='cuda' if torch.cuda.is_available() else 'cpu',
         initialize_optimizers=True
     )
 
-    train_rl("../output/rl/model.pth", start_checkpoint_path=checkpoint_path, checkpoint_dir="../output/rl/checkpoints", expert_data_path="../data/othello_dataset.csv")
+    train_rl("../output/rl/model.pth",
+             start_checkpoint_path=checkpoint_path,
+             checkpoint_dir="../output/rl/checkpoints",
+             expert_data_path="../data/othello_dataset.csv",
+             eval_strategies={
+                 "random": random_strategy
+             }
+    )
 
 
 if __name__ == "__main__":

@@ -40,6 +40,19 @@ class ActorCriticAgent:
 
         action_index = np.random.choice(np.arange(8 * 8), p=probs.squeeze(0).cpu().numpy())
         return (action_index // 8, action_index % 8)
+    
+    def select_optimal_action(self, state):
+        legal_moves = state.get_available_actions()
+        if not legal_moves:
+            return None
+
+        state_tensor = state_to_tensor(state).unsqueeze(0).to(self.device)
+        with torch.no_grad():
+            probs = self.policy_net.predict_probs(state_tensor, legal_moves_mask=state.get_legal_moves_mask())
+
+        probs = probs.squeeze(0).cpu().numpy()
+        action_index = np.argmax(probs)
+        return (action_index // 8, action_index % 8)
 
     def add_to_memory(self, state, action, reward, next_state):
         self.memory.add((
