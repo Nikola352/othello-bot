@@ -219,8 +219,8 @@ class RegressionMetrics:
 
 
 def compute_regression_metrics(predictions: torch.Tensor, targets: torch.Tensor) -> Tuple[float, float, float]:
-    predictions = predictions.cpu().numpy().flatten()
-    targets = targets.cpu().numpy().flatten()
+    predictions = predictions.detach().cpu().numpy().flatten()
+    targets = targets.detach().cpu().numpy().flatten()
     
     mse = np.mean((predictions - targets) ** 2)
     mae = np.mean(np.abs(predictions - targets))
@@ -320,6 +320,8 @@ def pretrain_value_network(states, values,
     
     assert abs(train_split + val_split + test_split - 1.0) < 1e-6, \
         "Train, val, and test splits must sum to 1.0"
+    
+    values = np.array(values, dtype=np.float32)
     
     print(f"Value statistics:")
     print(f"  Min:  {values.min():.4f}")
