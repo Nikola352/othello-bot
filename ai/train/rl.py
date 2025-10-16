@@ -5,7 +5,7 @@ import torch
 import matplotlib.pyplot as plt
 
 from train.process_games import preload_expert_memory
-from model.network import PolicyNetwork
+from model.network import PolicyNetwork, ValueNetwork
 from model.agent import ActorCriticAgent
 from model.settings import EPS_DECAY, LR, START_EPS, END_EPS, EPISODES, TARGET_LIFESPAN
 from environment.environment import EnvState
@@ -17,12 +17,13 @@ def train_rl(
         start_episode = 1, 
         checkpoint_dir: str = None, 
         policy_net: PolicyNetwork = None,
+        value_net: ValueNetwork = None,
         expert_data_path: str = None,
-        start_from_policy: bool = True,
+        start_from_policy: bool = False,
     ):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    agent = ActorCriticAgent(device, policy_net=policy_net, actor_frozen=True)
+    agent = ActorCriticAgent(device, policy_net=policy_net, value_net=value_net, actor_frozen=False)
     if start_checkpoint_path and os.path.exists(start_checkpoint_path):
         if start_from_policy:
             agent.load_policy_net(start_checkpoint_path)

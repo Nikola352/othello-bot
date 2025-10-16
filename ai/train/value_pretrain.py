@@ -9,7 +9,8 @@ from torch.utils.data import DataLoader, Dataset, random_split
 import matplotlib.pyplot as plt
 from datetime import datetime
 from model.network import ValueNetwork
-from model.settings import BATCH_SIZE, EPOCHS, LR
+from model.settings import BATCH_SIZE, LR
+from model.settings import VAL_NET_EPOCHS as EPOCHS
 
 
 class ValueDataset(Dataset):
@@ -331,7 +332,7 @@ def pretrain_value_network(states, values,
     
     # Setup directories
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_dir = Path(save_path).parent if save_path else Path("./value_training_output")
+    output_dir = Path(save_path) if save_path else Path("./value_training_output")
     run_dir = output_dir / f"value_run_{timestamp}"
     run_dir.mkdir(parents=True, exist_ok=True)
     
@@ -469,12 +470,6 @@ def pretrain_value_network(states, values,
     print(f"  Test Loss (MSE):       {test_loss:.4f}")
     print(f"  Test MAE:              {test_mae:.4f}")
     print(f"  Test R²:               {test_r2:.4f}")
-    
-    # Save final model
-    if save_path is not None:
-        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
-        torch.save(network.state_dict(), save_path)
-        print(f"\nFinal model saved to: {save_path}")
     
     # Save metrics and generate plots
     print("\nGenerating training visualizations...")

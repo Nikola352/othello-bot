@@ -248,7 +248,7 @@ def pretrain_policy_network(states, actions,
     
     # Setup directories
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_dir = Path(save_path).parent if save_path else Path("./training_output")
+    output_dir = Path(save_path) if save_path else Path("./training_output")
     run_dir = output_dir / f"run_{timestamp}"
     run_dir.mkdir(parents=True, exist_ok=True)
     
@@ -378,12 +378,6 @@ def pretrain_policy_network(states, actions,
     print(f"  Best Validation Accuracy: {metrics.best_val_accuracy:.2f}%")
     print(f"  Test Loss:                {test_loss:.4f}")
     print(f"  Test Accuracy:            {test_accuracy:.2f}%")
-    
-    # Save final model
-    if save_path is not None:
-        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
-        torch.save(network.state_dict(), save_path)
-        print(f"\nFinal model saved to: {save_path}")
     
     # Save metrics and generate plots
     print("\nGenerating training visualizations...")
