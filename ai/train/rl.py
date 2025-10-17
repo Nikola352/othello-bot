@@ -419,10 +419,6 @@ def train_rl(
         metrics.add_episode_reward(total_reward)
         episode_reward_buffer.append(total_reward)
         
-        # Update target network
-        if episode % TARGET_LIFESPAN == 0:
-            agent.update_target()
-        
         # Logging
         if episode % 1000 == 0:
             avg_reward = np.mean(episode_reward_buffer)
