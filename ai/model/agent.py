@@ -82,7 +82,7 @@ class ActorCriticAgent:
         values = self.value_net(state_batch)
         with torch.no_grad():
             next_state_values = self.value_net(next_state_batch)
-            target_values = reward_batch + (1-done_batch) * (-turn_batch) * GAMMA * next_state_values
+            target_values = reward_batch + (1-done_batch) * GAMMA * next_state_values
         advantages = target_values - values
 
         critic_loss = advantages.pow(2).mean()
