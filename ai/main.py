@@ -19,7 +19,7 @@ def main():
         value_checkpoint_path=value_result['run_dir'] / "checkpoints" / "best_value_model.pt",
         output_path='../output/pretrained_agent.pt',
         device='cuda' if torch.cuda.is_available() else 'cpu',
-        initialize_optimizers=True
+        initialize_optimizers=True,
     )
 
     train_rl("../output/rl/model.pth",
@@ -27,7 +27,8 @@ def main():
              checkpoint_dir="../output/rl/checkpoints",
              expert_data_path="../data/othello_dataset.csv",
              eval_strategies={
-                 "random": random_strategy
+                 "random": random_strategy,
+                 "greedy": greedy_strategy,
              }
     )
 
