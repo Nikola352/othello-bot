@@ -283,8 +283,8 @@ class RLEvaluator:
                 game_over = state.is_final()
             
             # Determine winner
-            final_score = state.get_score()
-            agent_final = final_score if agent_is_first else -final_score
+            result = state.get_result()
+            agent_final = result if agent_is_first else -result
             
             if agent_final > 0:
                 agent_wins += 1
