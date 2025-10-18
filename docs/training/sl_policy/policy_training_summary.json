@@ -1,0 +1,19 @@
+{
+    "total_epochs": 30,
+    "best_epoch": 28,
+    "best_val_loss": 1.4453745811332555,
+    "best_val_accuracy": 49.613827495134835,
+    "test_loss": 1.4414403757718923,
+    "test_accuracy": 49.7376285793717,
+    "dataset_splits": {
+        "train": 1074017,
+        "val": 230146,
+        "test": 230148
+    },
+    "hyperparameters": {
+        "batch_size": 64,
+        "initial_lr": 0.001,
+        "optimizer": "Adam",
+        "scheduler": "ReduceLROnPlateau"
+    }
+}

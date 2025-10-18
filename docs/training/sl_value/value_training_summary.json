@@ -1,0 +1,23 @@
+{
+    "total_epochs": 50,
+    "best_epoch": 48,
+    "best_val_loss": 0.18464866805949043,
+    "best_val_r2": 0.663841618641834,
+    "test_loss": 0.18589815399942214,
+    "test_mse": 0.18589815405638377,
+    "test_mae": 0.2582093088915854,
+    "test_r2": 0.6616199837481276,
+    "dataset_splits": {
+        "train": 1074017,
+        "val": 230146,
+        "test": 230148
+    },
+    "hyperparameters": {
+        "batch_size": 64,
+        "initial_lr": 0.001,
+        "gamma": 0.99,
+        "optimizer": "Adam",
+        "scheduler": "ReduceLROnPlateau",
+        "loss_fn": "MSELoss"
+    }
+}
